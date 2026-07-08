@@ -1,0 +1,44 @@
+services:
+  fontypython:
+    # fontypython is Python2/wxGTK-era and was dropped from newer Ubuntu
+    # repos, so this builds from old Ubuntu 18.04 where the package still
+    # exists. See Dockerfile for the actual image definition.
+    build:
+      context: .
+      args:
+        HOST_UID: ${HOST_UID}
+        HOST_GID: ${HOST_GID}
+        HOST_USER: ${HOST_USER}
+        HOST_HOME: ${HOME}
+
+    # Share host network so X11 (GUI) connections just work.
+    network_mode: host
+
+    environment:
+      - DISPLAY=${DISPLAY}
+      # Belt-and-suspenders: the container's own /etc/passwd already says
+      # this uid's home is ${HOME} (baked in at build time), but setting
+      # it explicitly too costs nothing.
+      - HOME=${HOME}
+      - XAUTHORITY=${HOME}/.Xauthority
+
+    volumes:
+      # X11 socket — lets the container put windows on the host display.
+      - /tmp/.X11-unix:/tmp/.X11-unix
+
+      # Host's X11 auth cookie (read-only), mounted at the same path.
+      - ${XAUTHORITY:-${HOME}/.Xauthority}:${HOME}/.Xauthority:ro
+
+      # THE single active-fonts directory. FontyPython still sees its
+      # legacy in-container path, while the host source path is configured
+      # in .env by run.sh.
+      - ${FONTYPYTHON_ACTIVE_FONT_DIR}:${HOME}/.fonts
+
+      # Font library/collection — the pool of fonts you import into
+      # FontyPython and enable/disable from.
+      - ${FONTYPYTHON_FONT_COLLECTION_DIR}:${HOME}/Resources/fonts
+
+      # FontyPython's own app settings/db, persisted across restarts.
+      - ${FONTYPYTHON_SETTINGS_DIR}:${HOME}/.fontypython
+
+    command: fontypython
